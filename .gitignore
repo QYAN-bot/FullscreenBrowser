@@ -1,0 +1,24 @@
+# Built files
+*.iml
+.gradle
+/local.properties
+/.idea
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Generated
+*.apk
+*.aab
+*.ap_
+*.dex
+bin/
+gen/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
