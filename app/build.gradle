@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.fullscreenpwa'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.fullscreenpwa"
+        minSdk 28          // Android 9+ (cutout API 需要)
+        targetSdk 34
+        versionCode 8
+        versionName "1.0.8"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+}

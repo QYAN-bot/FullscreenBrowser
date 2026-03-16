@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Background -->
+    <path
+        android:fillColor="#1a73e8"
+        android:pathData="M0,0h108v108H0z" />
+    <!-- Fullscreen icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M30,34 L30,30 L42,30 L42,34 L34,34 L34,42 L30,42 Z
+                          M78,34 L78,30 L66,30 L66,34 L74,34 L74,42 L78,42 Z
+                          M30,74 L30,78 L42,78 L42,74 L34,74 L34,66 L30,66 Z
+                          M78,74 L78,78 L66,78 L66,74 L74,74 L74,66 L78,66 Z" />
+</vector>

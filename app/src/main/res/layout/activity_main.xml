@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:fitsSystemWindows="false">
+
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="48dp"
+        android:paddingLeft="8dp"
+        android:paddingRight="8dp"
+        android:paddingBottom="4dp"
+        android:background="#CC000000">
+
+        <EditText
+            android:id="@+id/urlBar"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="输入网址或搜索..."
+            android:textSize="14sp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#888888"
+            android:background="@drawable/url_bar_bg"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:singleLine="true"
+            android:imeOptions="actionGo"
+            android:inputType="textUri"
+            android:selectAllOnFocus="true" />
+
+        <!-- Go 按钮 -->
+        <ImageButton
+            android:id="@+id/btnGo"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginLeft="4dp"
+            android:src="@android:drawable/ic_media_play"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Go"
+            android:tint="#FFFFFF" />
+
+        <!-- 书签按钮 -->
+        <ImageButton
+            android:id="@+id/btnBookmarks"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/star_big_on"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Bookmarks"
+            android:tint="#FFC107" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_below="@id/toolbar"
+        android:max="100"
+        android:visibility="gone"
+        android:progressTint="#4CAF50" />
+
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/progressBar" />
+
+    <!-- 切换按钮：右下角，几乎隐形 -->
+    <ImageButton
+        android:id="@+id/btnToggle"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_marginBottom="16dp"
+        android:layout_marginRight="12dp"
+        android:background="@drawable/circle_btn_bg"
+        android:contentDescription="Toggle URL bar"
+        android:src="@android:drawable/ic_menu_edit"
+        android:scaleType="centerInside"
+        android:padding="4dp"
+        android:tint="#666666"
+        android:alpha="0.15"
+        android:elevation="4dp" />
+
+</RelativeLayout>
