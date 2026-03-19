@@ -129,6 +129,10 @@ public class MainActivity extends Activity {
 
         setContentView(R.layout.activity_main);
         AndroidBug5497Workaround.assistActivity(this);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false);
@@ -695,6 +699,22 @@ public class MainActivity extends Activity {
 
         dialogHolder[0] = dialog;
 
+        // 夜间模式开关
+        boolean darkMode = prefs.getBoolean("dark_mode", false);
+        TextView btnDarkMode = makeActionButton(darkMode ? "🌙 网页深色模式：已开启" : "☀ 网页深色模式：已关闭");
+        btnDarkMode.setTextColor(darkMode ? Color.parseColor("#FFC107") : Color.parseColor("#888888"));
+        btnDarkMode.setOnClickListener(v -> {
+            boolean newDark = !prefs.getBoolean("dark_mode", false);
+            prefs.edit().putBoolean("dark_mode", newDark).apply();
+            applyDarkMode(newDark);
+            Toast.makeText(this, newDark ? "深色模式已开启" : "深色模式已关闭，刷新页面生效", Toast.LENGTH_SHORT).show();
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+        });
+        LinearLayout.LayoutParams dmBtnLP = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        dmBtnLP.topMargin = dp(4);
+        root.addView(btnDarkMode, dmBtnLP);
+
         // 收藏/取消收藏
         btnSave.setOnClickListener(v -> {
             if (currentUrl == null) return;
@@ -1228,6 +1248,15 @@ public class MainActivity extends Activity {
         float yPct = (float) newY / parent.getHeight();
         prefs.edit().putFloat(KEY_BTN_X, xPct).putFloat(KEY_BTN_Y, yPct).apply();
     }
+    private void applyDarkMode(boolean enable) {
+        WebSettings settings = webView.getSettings();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            settings.setAlgorithmicDarkeningAllowed(enable);
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            settings.setForceDark(enable ?
+                    WebSettings.FORCE_DARK_ON : WebSettings.FORCE_DARK_OFF);
+        }
+    }
 
     // ============ 自定义桌面图标 ============
 
@@ -1386,12 +1415,8 @@ public class MainActivity extends Activity {
         settings.setSupportZoom(true);
         settings.setBuiltInZoomControls(true);
         settings.setDisplayZoomControls(false);
-        // ★ 禁止 WebView 自动给网页加深色模式
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            settings.setAlgorithmicDarkeningAllowed(false);
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            settings.setForceDark(WebSettings.FORCE_DARK_OFF);
-        }
+        // ★ 根据设置决定深色模式
+        applyDarkMode(prefs.getBoolean("dark_mode", false));
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
 
         CookieManager.getInstance().setAcceptCookie(true);
