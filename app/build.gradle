@@ -10,8 +10,8 @@ android {
         applicationId "com.fullscreenpwa"
         minSdk 28          // Android 9+ (cutout API 需要)
         targetSdk 34
-        versionCode 9
-        versionName "1.0.9"
+        versionCode 13
+        versionName "1.1.0"
     }
 
     buildTypes {

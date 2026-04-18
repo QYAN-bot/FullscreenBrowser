@@ -8,6 +8,9 @@
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <application
         android:allowBackup="true"
@@ -20,11 +23,12 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:windowSoftInputMode="adjustResize">
+            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|uiMode|fontScale"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTask">
 
             <layout
-                android:windowLayoutInDisplayCutoutMode="always" />
+                android:windowLayoutInDisplayCutoutMode="shortEdges" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

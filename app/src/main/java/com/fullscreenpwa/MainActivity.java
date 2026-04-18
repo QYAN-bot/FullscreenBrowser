@@ -82,7 +82,7 @@ public class MainActivity extends Activity {
     private LinearLayout toolbar;
     private boolean toolbarVisible = true;
     private ImageButton btnToggle;
-
+    private PermissionRequest pendingPermissionRequest;
     private ValueCallback<Uri[]> fileUploadCallback;
     private SharedPreferences prefs;
 
@@ -151,6 +151,7 @@ public class MainActivity extends Activity {
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         }
+        applyStatusBarVisibility(prefs.getBoolean("show_status_bar", false));
 
         webView = findViewById(R.id.webView);
         urlBar = findViewById(R.id.urlBar);
@@ -434,10 +435,12 @@ public class MainActivity extends Activity {
         List<Bookmark> bookmarks = getBookmarks();
         String homeUrl = getHomeUrl();
 
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(20), dp(16), dp(20), dp(8));
-
         // 当前页面操作区
         TextView currentLabel = new TextView(this);
         currentLabel.setText("当前页面");
@@ -693,9 +696,11 @@ public class MainActivity extends Activity {
         tsBtnLP.topMargin = dp(4);
         root.addView(btnToggleSettings, tsBtnLP);
 
+        scroll.addView(root);
+
         AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog)
-            .setView(root)
-            .create();
+                .setView(scroll)
+                .create();
 
         dialogHolder[0] = dialog;
 
@@ -714,6 +719,50 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         dmBtnLP.topMargin = dp(4);
         root.addView(btnDarkMode, dmBtnLP);
+
+        // 状态栏设置
+        boolean showStatusBar = prefs.getBoolean("show_status_bar", false);
+        TextView btnStatusBar = makeActionButton(
+                showStatusBar ? "📶 显示状态栏：已开启" : "📶 显示状态栏：已关闭");
+        btnStatusBar.setTextColor(showStatusBar ?
+                Color.parseColor("#4CAF50") : Color.parseColor("#888888"));
+        btnStatusBar.setOnClickListener(v -> {
+            boolean newVal = !prefs.getBoolean("show_status_bar", false);
+            prefs.edit().putBoolean("show_status_bar", newVal).apply();
+            applyStatusBarVisibility(newVal);
+            Toast.makeText(this,
+                    newVal ? "状态栏已显示" : "状态栏已隐藏",
+                    Toast.LENGTH_SHORT).show();
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+        });
+        LinearLayout.LayoutParams sbBtnLP = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        sbBtnLP.topMargin = dp(4);
+        root.addView(btnStatusBar, sbBtnLP);
+
+        // 状态栏样式设置（仅在开启时显示）
+        if (showStatusBar) {
+            TextView btnStatusStyle = makeActionButton("🎨 状态栏样式设置");
+            btnStatusStyle.setOnClickListener(v -> {
+                if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+                showStatusBarStyleDialog();
+            });
+            LinearLayout.LayoutParams ssBtnLP = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            ssBtnLP.topMargin = dp(4);
+            root.addView(btnStatusStyle, ssBtnLP);
+        }
+
+        // 页面缩放
+        TextView btnZoom = makeActionButton("🔍 页面缩放：" + prefs.getInt("page_zoom", 100) + "%");
+        btnZoom.setOnClickListener(v -> {
+            if (dialogHolder[0] != null) dialogHolder[0].dismiss();
+            showZoomDialog();
+        });
+        LinearLayout.LayoutParams zoomBtnLP = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        zoomBtnLP.topMargin = dp(4);
+        root.addView(btnZoom, zoomBtnLP);
 
         // 收藏/取消收藏
         btnSave.setOnClickListener(v -> {
@@ -1257,7 +1306,182 @@ public class MainActivity extends Activity {
                     WebSettings.FORCE_DARK_ON : WebSettings.FORCE_DARK_OFF);
         }
     }
+    private void showZoomDialog() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(24), dp(20), dp(24), dp(16));
+        root.setBackgroundColor(Color.parseColor("#1A1A1A"));
 
+        int currentZoom = prefs.getInt("page_zoom", 100);
+
+        TextView title = new TextView(this);
+        title.setText("🔍 页面缩放");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(16);
+        title.setTypeface(null, Typeface.BOLD);
+        root.addView(title);
+
+        TextView zoomLabel = new TextView(this);
+        zoomLabel.setText("缩放：" + currentZoom + "%");
+        zoomLabel.setTextColor(Color.WHITE);
+        zoomLabel.setTextSize(13);
+        zoomLabel.setPadding(0, dp(12), 0, dp(4));
+        root.addView(zoomLabel);
+
+        EditText zoomInput = new EditText(this);
+        zoomInput.setText(String.valueOf(currentZoom));
+        zoomInput.setTextColor(Color.WHITE);
+        zoomInput.setTextSize(14);
+        zoomInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        zoomInput.setSingleLine(true);
+        zoomInput.setBackgroundColor(Color.parseColor("#2A2A2A"));
+        zoomInput.setPadding(dp(12), dp(8), dp(12), dp(8));
+        zoomInput.setSelectAllOnFocus(true);
+        root.addView(zoomInput);
+
+        android.widget.SeekBar zoomBar = new android.widget.SeekBar(this);
+        zoomBar.setMax(200);
+        zoomBar.setProgress(currentZoom - 50);
+        zoomBar.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                int zoom = progress + 50;
+                zoomLabel.setText("缩放：" + zoom + "%");
+                zoomInput.setText(String.valueOf(zoom));
+                webView.getSettings().setTextZoom(zoom);
+            }
+            @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+                int zoom = seekBar.getProgress() + 50;
+                prefs.edit().putInt("page_zoom", zoom).apply();
+            }
+        });
+        LinearLayout.LayoutParams barLP = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        barLP.topMargin = dp(8);
+        root.addView(zoomBar, barLP);
+
+        // 按钮行
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams rowLP = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowLP.topMargin = dp(12);
+
+        TextView btnApply = makeActionButton("输入后应用");
+        btnApply.setOnClickListener(v -> {
+            try {
+                int z = Integer.parseInt(zoomInput.getText().toString().trim());
+                z = Math.max(50, Math.min(250, z));
+                zoomInput.setText(String.valueOf(z));
+                zoomBar.setProgress(z - 50);
+                zoomLabel.setText("缩放：" + z + "%");
+                webView.getSettings().setTextZoom(z);
+                prefs.edit().putInt("page_zoom", z).apply();
+            } catch (NumberFormatException ignored) {
+                Toast.makeText(this, "请输入 50-250 之间的数字", Toast.LENGTH_SHORT).show();
+            }
+        });
+        btnRow.addView(btnApply);
+
+        addSpacer(btnRow, dp(8));
+
+        TextView btnReset = makeActionButton("重置 100%");
+        btnReset.setOnClickListener(v -> {
+            zoomBar.setProgress(50);
+            zoomInput.setText("100");
+            zoomLabel.setText("缩放：100%");
+            webView.getSettings().setTextZoom(100);
+            prefs.edit().putInt("page_zoom", 100).apply();
+        });
+        btnRow.addView(btnReset);
+
+        root.addView(btnRow, rowLP);
+
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog)
+                .setView(root)
+                .setPositiveButton("关闭", null)
+                .create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        dialog.show();
+    }
+
+    private void applyStatusBarVisibility(boolean show) {
+        Window window = getWindow();
+
+        // 读取颜色设置
+        String colorStr = prefs.getString("status_bar_color", "#00000000");
+        int statusColor;
+        try {
+            statusColor = Color.parseColor(colorStr);
+        } catch (Exception e) {
+            statusColor = Color.TRANSPARENT;
+        }
+
+        boolean lightIcons = prefs.getBoolean("status_bar_light_icons", false);
+
+        window.setStatusBarColor(show ? statusColor : Color.TRANSPARENT);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false);
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller != null) {
+                if (show) {
+                    controller.show(WindowInsets.Type.statusBars());
+                    if (lightIcons) {
+                        // 浅色图标（深色背景用）
+                        controller.setSystemBarsAppearance(0,
+                                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+                    } else {
+                        // 深色图标（浅色背景用）
+                        controller.setSystemBarsAppearance(
+                                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                                WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
+                    }
+                } else {
+                    controller.hide(WindowInsets.Type.statusBars());
+                    controller.setSystemBarsBehavior(
+                            WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            }
+        } else {
+            if (show) {
+                int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+                if (!lightIcons) {
+                    flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                }
+                window.getDecorView().setSystemUiVisibility(flags);
+            } else {
+                window.getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            }
+        }
+
+        if (toolbar != null) {
+            int topPadding = show ? getStatusBarHeight() + dp(8) : dp(48);
+            toolbar.setPadding(dp(8), topPadding, dp(8), dp(4));
+        }
+    }
+
+    private int getStatusBarHeight() {
+        int height = dp(48); // 默认值
+        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            height = getResources().getDimensionPixelSize(resourceId);
+        }
+        return height;
+    }
     // ============ 自定义桌面图标 ============
 
     private void showCustomIconPicker() {
@@ -1415,9 +1639,11 @@ public class MainActivity extends Activity {
         settings.setSupportZoom(true);
         settings.setBuiltInZoomControls(true);
         settings.setDisplayZoomControls(false);
+        settings.setTextZoom(prefs.getInt("page_zoom", 100));
         // ★ 根据设置决定深色模式
         applyDarkMode(prefs.getBoolean("dark_mode", false));
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setSupportMultipleWindows(true);
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
@@ -1510,6 +1736,24 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
+            // ★ 允许网页打开新窗口（有些网站用新窗口触发下载）
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog,
+                                          boolean isUserGesture, android.os.Message resultMsg) {
+                WebView tempView = new WebView(MainActivity.this);
+                tempView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
+                        String url = request.getUrl().toString();
+                        webView.loadUrl(url);
+                        return true;
+                    }
+                });
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(tempView);
+                resultMsg.sendToTarget();
+                return true;
+            }
             @Override
             public boolean onShowFileChooser(WebView webView,
                                              ValueCallback<Uri[]> filePathCallback,
@@ -1616,7 +1860,34 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                runOnUiThread(() -> request.grant(request.getResources()));
+                runOnUiThread(() -> {
+                    // 检查需要哪些 Android 权限
+                    String[] resources = request.getResources();
+                    java.util.List<String> needed = new java.util.ArrayList<>();
+                    for (String r : resources) {
+                        if (r.equals(PermissionRequest.RESOURCE_VIDEO_CAPTURE)) {
+                            if (checkSelfPermission(Manifest.permission.CAMERA)
+                                    != PackageManager.PERMISSION_GRANTED) {
+                                needed.add(Manifest.permission.CAMERA);
+                            }
+                        }
+                        if (r.equals(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+                            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                                    != PackageManager.PERMISSION_GRANTED) {
+                                needed.add(Manifest.permission.RECORD_AUDIO);
+                            }
+                        }
+                    }
+
+                    if (needed.isEmpty()) {
+                        request.grant(resources);
+                    } else {
+                        // 保存请求，等权限回调后再授权
+                        pendingPermissionRequest = request;
+                        requestPermissions(
+                                needed.toArray(new String[0]), 2001);
+                    }
+                });
             }
         });
     }
@@ -1664,6 +1935,26 @@ public class MainActivity extends Activity {
                         Toast.LENGTH_LONG).show();
                 }
             }
+        }
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 2001 && pendingPermissionRequest != null) {
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    allGranted = false;
+                    break;
+                }
+            }
+            if (allGranted) {
+                pendingPermissionRequest.grant(pendingPermissionRequest.getResources());
+            } else {
+                pendingPermissionRequest.deny();
+                Toast.makeText(this, "需要相机/麦克风权限才能使用此功能", Toast.LENGTH_LONG).show();
+            }
+            pendingPermissionRequest = null;
         }
     }
 
@@ -1764,12 +2055,30 @@ public class MainActivity extends Activity {
 
     private void saveBytes(byte[] bytes, String filename) {
         try {
-            File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-            if (!dir.exists()) dir.mkdirs();
-            File file = new File(dir, filename);
-            FileOutputStream fos = new FileOutputStream(file);
-            fos.write(bytes);
-            fos.close();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10+ 用 MediaStore
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename);
+                values.put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
+                values.put(android.provider.MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                Uri uri = getContentResolver().insert(
+                        android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                if (uri != null) {
+                    OutputStream os = getContentResolver().openOutputStream(uri);
+                    if (os != null) {
+                        os.write(bytes);
+                        os.close();
+                    }
+                }
+            } else {
+                // Android 9 及以下用老方法
+                File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                if (!dir.exists()) dir.mkdirs();
+                File file = new File(dir, filename);
+                FileOutputStream fos = new FileOutputStream(file);
+                fos.write(bytes);
+                fos.close();
+            }
             Toast.makeText(this, "已保存到 Downloads: " + filename, Toast.LENGTH_LONG).show();
         } catch (IOException e) {
             Toast.makeText(this, "保存失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -1804,17 +2113,29 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void onBlobStart(String filename, long totalSize) {
             try {
-                File dir = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DOWNLOADS);
-                if (!dir.exists()) dir.mkdirs();
-                outputFile = new File(dir, filename);
-                outputStream = new FileOutputStream(outputFile);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    android.content.ContentValues values = new android.content.ContentValues();
+                    values.put(android.provider.MediaStore.Downloads.DISPLAY_NAME, filename);
+                    values.put(android.provider.MediaStore.Downloads.MIME_TYPE, "application/octet-stream");
+                    values.put(android.provider.MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                    Uri uri = getContentResolver().insert(
+                            android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (uri != null) {
+                        outputStream = getContentResolver().openOutputStream(uri);
+                    }
+                } else {
+                    File dir = Environment.getExternalStoragePublicDirectory(
+                            Environment.DIRECTORY_DOWNLOADS);
+                    if (!dir.exists()) dir.mkdirs();
+                    outputFile = new File(dir, filename);
+                    outputStream = new FileOutputStream(outputFile);
+                }
                 currentFilename = filename;
             } catch (IOException e) {
                 Log.e(TAG, "Failed to create file: " + e.getMessage());
                 runOnUiThread(() ->
-                    Toast.makeText(MainActivity.this, "创建文件失败: " + e.getMessage(),
-                        Toast.LENGTH_LONG).show());
+                        Toast.makeText(MainActivity.this, "创建文件失败: " + e.getMessage(),
+                                Toast.LENGTH_LONG).show());
             }
         }
 
@@ -1926,6 +2247,22 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (webView != null) {
+            webView.saveState(outState);
+        }
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        if (webView != null && savedInstanceState != null) {
+            webView.restoreState(savedInstanceState);
+        }
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
         if (webView != null) {
@@ -1955,5 +2292,172 @@ public class MainActivity extends Activity {
                     | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
             }
         }
+        if (hasFocus && prefs != null && prefs.getBoolean("show_status_bar", false)) {
+            applyStatusBarVisibility(true);
+        }
+    }
+    private void showStatusBarStyleDialog() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(24), dp(20), dp(24), dp(16));
+        root.setBackgroundColor(Color.parseColor("#1A1A1A"));
+
+        TextView title = new TextView(this);
+        title.setText("🎨 状态栏样式");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(16);
+        title.setTypeface(null, Typeface.BOLD);
+        root.addView(title);
+
+        // 图标颜色切换
+        boolean lightIcons = prefs.getBoolean("status_bar_light_icons", false);
+        TextView iconLabel = new TextView(this);
+        iconLabel.setText("状态栏图标颜色");
+        iconLabel.setTextColor(Color.WHITE);
+        iconLabel.setTextSize(13);
+        iconLabel.setPadding(0, dp(12), 0, dp(4));
+        root.addView(iconLabel);
+
+        LinearLayout iconRow = new LinearLayout(this);
+        iconRow.setOrientation(LinearLayout.HORIZONTAL);
+
+        TextView btnDarkIcons = makeActionButton("● 深色图标");
+        btnDarkIcons.setTextColor(!lightIcons ? Color.parseColor("#4CAF50") : Color.WHITE);
+        TextView btnLightIcons = makeActionButton("○ 浅色图标");
+        btnLightIcons.setTextColor(lightIcons ? Color.parseColor("#4CAF50") : Color.WHITE);
+
+        final boolean[] currentLight = {lightIcons};
+        btnDarkIcons.setOnClickListener(v -> {
+            currentLight[0] = false;
+            btnDarkIcons.setTextColor(Color.parseColor("#4CAF50"));
+            btnLightIcons.setTextColor(Color.WHITE);
+            prefs.edit().putBoolean("status_bar_light_icons", false).apply();
+            applyStatusBarVisibility(true);
+        });
+        btnLightIcons.setOnClickListener(v -> {
+            currentLight[0] = true;
+            btnLightIcons.setTextColor(Color.parseColor("#4CAF50"));
+            btnDarkIcons.setTextColor(Color.WHITE);
+            prefs.edit().putBoolean("status_bar_light_icons", true).apply();
+            applyStatusBarVisibility(true);
+        });
+
+        iconRow.addView(btnDarkIcons);
+        addSpacer(iconRow, dp(8));
+        iconRow.addView(btnLightIcons);
+        root.addView(iconRow);
+
+        // 背景颜色
+        addDivider(root);
+
+        TextView bgLabel = new TextView(this);
+        bgLabel.setText("状态栏背景");
+        bgLabel.setTextColor(Color.WHITE);
+        bgLabel.setTextSize(13);
+        root.addView(bgLabel);
+
+        // 预设颜色
+        LinearLayout colorRow = new LinearLayout(this);
+        colorRow.setOrientation(LinearLayout.HORIZONTAL);
+        colorRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams crLP = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        crLP.topMargin = dp(8);
+
+        String[][] presets = {
+                {"透明", "#00000000"},
+                {"黑色", "#FF000000"},
+                {"白色", "#FFFFFFFF"},
+                {"深灰", "#FF333333"},
+                {"浅灰", "#FFE0E0E0"},
+        };
+
+        for (String[] preset : presets) {
+            TextView btn = new TextView(this);
+            btn.setText(preset[0]);
+            btn.setTextColor(Color.WHITE);
+            btn.setTextSize(11);
+            btn.setPadding(dp(10), dp(6), dp(10), dp(6));
+            // 预览色块
+            if (preset[1].equals("#00000000")) {
+                btn.setBackgroundColor(Color.parseColor("#2A2A2A"));
+            } else {
+                try {
+                    btn.setBackgroundColor(Color.parseColor(preset[1]));
+                    // 浅色背景用深色字
+                    int c = Color.parseColor(preset[1]);
+                    if (Color.red(c) + Color.green(c) + Color.blue(c) > 400) {
+                        btn.setTextColor(Color.BLACK);
+                    }
+                } catch (Exception ignored) {}
+            }
+            final String colorVal = preset[1];
+            btn.setOnClickListener(v -> {
+                prefs.edit().putString("status_bar_color", colorVal).apply();
+                applyStatusBarVisibility(true);
+                Toast.makeText(this, preset[0], Toast.LENGTH_SHORT).show();
+            });
+            colorRow.addView(btn);
+            addSpacer(colorRow, dp(4));
+        }
+
+        root.addView(colorRow, crLP);
+
+        // 自定义 hex 输入
+        LinearLayout hexRow = new LinearLayout(this);
+        hexRow.setOrientation(LinearLayout.HORIZONTAL);
+        hexRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams hrLP = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        hrLP.topMargin = dp(8);
+
+        TextView hashTag = new TextView(this);
+        hashTag.setText("#");
+        hashTag.setTextColor(Color.WHITE);
+        hashTag.setTextSize(14);
+        hexRow.addView(hashTag);
+
+        EditText hexInput = new EditText(this);
+        String savedColor = prefs.getString("status_bar_color", "#00000000");
+        hexInput.setText(savedColor.replace("#", ""));
+        hexInput.setTextColor(Color.WHITE);
+        hexInput.setTextSize(13);
+        hexInput.setSingleLine(true);
+        hexInput.setBackgroundColor(Color.parseColor("#2A2A2A"));
+        hexInput.setPadding(dp(8), dp(6), dp(8), dp(6));
+        hexInput.setHint("RRGGBB 或 AARRGGBB");
+        hexInput.setHintTextColor(Color.parseColor("#555555"));
+        LinearLayout.LayoutParams hexLP = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        hexInput.setLayoutParams(hexLP);
+        hexRow.addView(hexInput);
+
+        addSpacer(hexRow, dp(8));
+
+        TextView btnApplyHex = makeActionButton("应用");
+        btnApplyHex.setOnClickListener(v -> {
+            String hex = hexInput.getText().toString().trim();
+            try {
+                Color.parseColor("#" + hex);
+                prefs.edit().putString("status_bar_color", "#" + hex).apply();
+                applyStatusBarVisibility(true);
+                Toast.makeText(this, "颜色已应用", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {
+                Toast.makeText(this, "无效的颜色值", Toast.LENGTH_SHORT).show();
+            }
+        });
+        hexRow.addView(btnApplyHex);
+
+        root.addView(hexRow, hrLP);
+
+        AlertDialog dialog = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog)
+                .setView(root)
+                .setPositiveButton("关闭", null)
+                .create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+        dialog.show();
     }
 }
