@@ -74,8 +74,6 @@ public class MainActivity extends Activity {
     private static final String KEY_BTN_Y = "toggle_btn_y";
     private static final String KEY_BTN_SIZE = "toggle_btn_size";
     private static final String KEY_BTN_ALPHA = "toggle_btn_alpha";
-    private android.os.Handler watchdog = new android.os.Handler(android.os.Looper.getMainLooper());
-    private Runnable blackScreenCheck;
     private WebView webView;
     private EditText urlBar;
     private ProgressBar progressBar;
@@ -138,7 +136,8 @@ public class MainActivity extends Activity {
             window.setDecorFitsSystemWindows(false);
             WindowInsetsController controller = window.getInsetsController();
             if (controller != null) {
-                controller.hide(WindowInsets.Type.statusBars());
+                controller.hide(WindowInsets.Type.statusBars()
+                    | WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(
                     WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
             }
@@ -194,18 +193,6 @@ public class MainActivity extends Activity {
             if (homeUrl.isEmpty()) {
                 showFirstRunSetup();
             } else {
-                // ★ 定时检测黑屏并强制重绘
-                blackScreenCheck = new Runnable() {
-                    @Override
-                    public void run() {
-                        if (webView != null) {
-                            // 触发一次重绘
-                            webView.invalidate();
-                        }
-                        watchdog.postDelayed(this, 3000);
-                    }
-                };
-                watchdog.postDelayed(blackScreenCheck, 3000);
                 loadUrl(homeUrl);
             }
         }
@@ -1718,11 +1705,6 @@ public class MainActivity extends Activity {
                     "    if(blob instanceof Blob) window._blobStore[url]=blob;" +
                     "    return url;" +
                     "  };" +
-                            // ★ 持久化存储 API 支持
-                            "if(navigator.storage){" +
-                            "  navigator.storage.persist=function(){return Promise.resolve(true);};" +
-                            "  navigator.storage.persisted=function(){return Promise.resolve(true);};" +
-                            "}" +
                     "  var origRevoke=URL.revokeObjectURL;" +
                     "  URL.revokeObjectURL=function(url){" +
                     "    setTimeout(function(){" +
@@ -1730,6 +1712,12 @@ public class MainActivity extends Activity {
                     "      origRevoke.call(URL,url);" +
                     "    },5000);" +
                     "  };" +
+                    "}" +
+                    // 持久化存储 API 支持（放在 blob hook 外面）
+                    "if(navigator.storage&&!navigator.storage._patched){" +
+                    "  navigator.storage._patched=true;" +
+                    "  navigator.storage.persist=function(){return Promise.resolve(true);};" +
+                    "  navigator.storage.persisted=function(){return Promise.resolve(true);};" +
                     "}" +
                     "})();", null);
             }
@@ -2237,28 +2225,6 @@ public class MainActivity extends Activity {
         super.onResume();
         if (webView != null) {
             webView.onResume();
-            webView.resumeTimers();
-            // 强制刷新一帧，防止黑屏
-            webView.postDelayed(() -> {
-                webView.setVisibility(View.GONE);
-                webView.setVisibility(View.VISIBLE);
-            }, 100);
-        }
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (webView != null) {
-            webView.saveState(outState);
-        }
-    }
-
-    @Override
-    protected void onRestoreInstanceState(Bundle savedInstanceState) {
-        super.onRestoreInstanceState(savedInstanceState);
-        if (webView != null && savedInstanceState != null) {
-            webView.restoreState(savedInstanceState);
         }
     }
 
@@ -2267,7 +2233,6 @@ public class MainActivity extends Activity {
         super.onPause();
         if (webView != null) {
             webView.onPause();
-            webView.pauseTimers();
         }
     }
 
@@ -2275,25 +2240,28 @@ public class MainActivity extends Activity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                WindowInsetsController controller = getWindow().getInsetsController();
-                if (controller != null) {
-                    controller.hide(WindowInsets.Type.statusBars());
-                    controller.setSystemBarsBehavior(
-                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-                }
+            boolean showStatusBar = prefs != null && prefs.getBoolean("show_status_bar", false);
+            if (showStatusBar) {
+                applyStatusBarVisibility(true);
             } else {
-                getWindow().getDecorView().setSystemUiVisibility(
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowInsetsController controller = getWindow().getInsetsController();
+                    if (controller != null) {
+                        controller.hide(WindowInsets.Type.statusBars()
+                            | WindowInsets.Type.navigationBars());
+                        controller.setSystemBarsBehavior(
+                            WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                    }
+                } else {
+                    getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                }
             }
-        }
-        if (hasFocus && prefs != null && prefs.getBoolean("show_status_bar", false)) {
-            applyStatusBarVisibility(true);
         }
     }
     private void showStatusBarStyleDialog() {
