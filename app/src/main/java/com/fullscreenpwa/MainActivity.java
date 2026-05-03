@@ -1459,6 +1459,29 @@ public class MainActivity extends Activity {
             int topPadding = show ? getStatusBarHeight() + dp(8) : dp(48);
             toolbar.setPadding(dp(8), topPadding, dp(8), dp(4));
         }
+        // ★ 给 WebView 加顶部 padding，防止网页内容被状态栏盖住
+        if (webView != null) {
+            if (show) {
+                int sbHeight = getStatusBarHeight();
+                // 记录高度让 onPageFinished 也能用
+                webView.evaluateJavascript("window._sbPadHeight=" + sbHeight + ";", null);
+                // 注入 CSS 给网页顶部留空间
+                webView.evaluateJavascript(
+                        "(function(){" +
+                                "var s=document.getElementById('_sbPad');" +
+                                "if(!s){s=document.createElement('style');s.id='_sbPad';document.head.appendChild(s);}" +
+                                "s.textContent='body{padding-top:" + sbHeight + "px !important;}';" +
+                                "})();", null);
+            } else {
+                webView.evaluateJavascript("window._sbPadHeight=0;", null);
+                // 移除注入的 padding
+                webView.evaluateJavascript(
+                        "(function(){" +
+                                "var s=document.getElementById('_sbPad');" +
+                                "if(s) s.textContent='';" +
+                                "})();", null);
+            }
+        }
     }
 
     private int getStatusBarHeight() {
@@ -1718,6 +1741,12 @@ public class MainActivity extends Activity {
                     "  navigator.storage._patched=true;" +
                     "  navigator.storage.persist=function(){return Promise.resolve(true);};" +
                     "  navigator.storage.persisted=function(){return Promise.resolve(true);};" +
+                    "}" +
+                    // 状态栏显示时给网页加顶部 padding
+                    "if(window._sbPadHeight){" +
+                    "  var s=document.getElementById('_sbPad');" +
+                    "  if(!s){s=document.createElement('style');s.id='_sbPad';document.head.appendChild(s);}" +
+                    "  s.textContent='body{padding-top:'+window._sbPadHeight+'px !important;}';" +
                     "}" +
                     "})();", null);
             }
