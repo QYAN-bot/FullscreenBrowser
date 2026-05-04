@@ -1463,23 +1463,10 @@ public class MainActivity extends Activity {
         if (webView != null) {
             if (show) {
                 int sbHeight = getStatusBarHeight();
-                // 记录高度让 onPageFinished 也能用
-                webView.evaluateJavascript("window._sbPadHeight=" + sbHeight + ";", null);
-                // 注入 CSS 给网页顶部留空间
-                webView.evaluateJavascript(
-                        "(function(){" +
-                                "var s=document.getElementById('_sbPad');" +
-                                "if(!s){s=document.createElement('style');s.id='_sbPad';document.head.appendChild(s);}" +
-                                "s.textContent='body{padding-top:" + sbHeight + "px !important;}';" +
-                                "})();", null);
+                webView.setPadding(0, sbHeight, 0, 0);
+                webView.setClipToPadding(false);
             } else {
-                webView.evaluateJavascript("window._sbPadHeight=0;", null);
-                // 移除注入的 padding
-                webView.evaluateJavascript(
-                        "(function(){" +
-                                "var s=document.getElementById('_sbPad');" +
-                                "if(s) s.textContent='';" +
-                                "})();", null);
+                webView.setPadding(0, 0, 0, 0);
             }
         }
     }
@@ -1741,12 +1728,6 @@ public class MainActivity extends Activity {
                     "  navigator.storage._patched=true;" +
                     "  navigator.storage.persist=function(){return Promise.resolve(true);};" +
                     "  navigator.storage.persisted=function(){return Promise.resolve(true);};" +
-                    "}" +
-                    // 状态栏显示时给网页加顶部 padding
-                    "if(window._sbPadHeight){" +
-                    "  var s=document.getElementById('_sbPad');" +
-                    "  if(!s){s=document.createElement('style');s.id='_sbPad';document.head.appendChild(s);}" +
-                    "  s.textContent='body{padding-top:'+window._sbPadHeight+'px !important;}';" +
                     "}" +
                     "})();", null);
             }
@@ -2368,6 +2349,8 @@ public class MainActivity extends Activity {
                 {"深灰", "#FF333333"},
                 {"浅灰", "#FFE0E0E0"},
         };
+        
+        EditText hexInput = new EditText(this);
 
         for (String[] preset : presets) {
             TextView btn = new TextView(this);
@@ -2392,7 +2375,7 @@ public class MainActivity extends Activity {
             btn.setOnClickListener(v -> {
                 prefs.edit().putString("status_bar_color", colorVal).apply();
                 applyStatusBarVisibility(true);
-                Toast.makeText(this, preset[0], Toast.LENGTH_SHORT).show();
+                hexInput.setText(colorVal.replace("#", ""));
             });
             colorRow.addView(btn);
             addSpacer(colorRow, dp(4));
@@ -2400,7 +2383,7 @@ public class MainActivity extends Activity {
 
         root.addView(colorRow, crLP);
 
-        // 自定义 hex 输入
+// 自定义 hex 输入
         LinearLayout hexRow = new LinearLayout(this);
         hexRow.setOrientation(LinearLayout.HORIZONTAL);
         hexRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -2414,7 +2397,6 @@ public class MainActivity extends Activity {
         hashTag.setTextSize(14);
         hexRow.addView(hashTag);
 
-        EditText hexInput = new EditText(this);
         String savedColor = prefs.getString("status_bar_color", "#00000000");
         hexInput.setText(savedColor.replace("#", ""));
         hexInput.setTextColor(Color.WHITE);
@@ -2438,7 +2420,6 @@ public class MainActivity extends Activity {
                 Color.parseColor("#" + hex);
                 prefs.edit().putString("status_bar_color", "#" + hex).apply();
                 applyStatusBarVisibility(true);
-                Toast.makeText(this, "颜色已应用", Toast.LENGTH_SHORT).show();
             } catch (Exception e) {
                 Toast.makeText(this, "无效的颜色值", Toast.LENGTH_SHORT).show();
             }
